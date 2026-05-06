@@ -1,0 +1,121 @@
+# ------------------------------------------------------------
+# 断网离线部署冒烟测试栈（与 ai-water-env 主栈完全隔离）
+# ------------------------------------------------------------
+# 区别于 ../docker-compose.yml:
+#   - 使用 ai-water-env-<name>:latest 项目镜像（验证 load 后镜像可起容器）
+#   - 容器名 water_test_*  （避免与 water_* 冲突）
+#   - 端口全部 +10000（18083 除外，避让 EMQX dashboard）
+#   - 卷名 water_test_*    （project 名独立已保证隔离，卷名加后缀更直观）
+#   - postgres 不挂 regions init 目录，避免业务 seed 污染
+# 用法（由 deploy/test_offline_deploy.py 驱动，或手动）：
+#   docker compose -p ai-water-env-offline-test -f deploy/docker-compose.test.yml up -d
+#   docker compose -p ai-water-env-offline-test -f deploy/docker-compose.test.yml down -v
+# ------------------------------------------------------------
+
+services:
+  postgres:
+    image: ai-water-env-postgres:latest
+    container_name: water_test_postgres
+    hostname: postgres
+    restart: "no"
+    ports:
+      - "15432:5432"
+    volumes:
+      - water_test_postgres_data:/var/lib/postgresql/data
+      - ../regions/${REGION_CODE:-ganzhou}/db/postgres:/docker-entrypoint-initdb.d
+    environment:
+      - POSTGRES_DB=water_env
+      - POSTGRES_USER=water
+      - POSTGRES_PASSWORD=water123
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U water -d water_env"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  tdengine:
+    image: ai-water-env-tdengine:latest
+    container_name: water_test_tdengine
+    hostname: tdengine
+    restart: "no"
+    ports:
+      - "16030:6030"
+      - "16041:6041"
+    volumes:
+      - water_test_tdengine_data:/var/lib/taos
+      - water_test_tdengine_logs:/var/log/taos
+    environment:
+      - TAOS_FQDN=tdengine
+    healthcheck:
+      test: ["CMD", "taos", "-s", "show databases"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  neo4j:
+    image: ai-water-env-neo4j:latest
+    container_name: water_test_neo4j
+    hostname: neo4j
+    restart: "no"
+    ports:
+      - "17474:7474"
+      - "17687:7687"
+    volumes:
+      - water_test_neo4j_data:/data
+      - water_test_neo4j_logs:/logs
+      - water_test_neo4j_plugins:/plugins
+    environment:
+      - NEO4J_AUTH=neo4j/water123
+      - NEO4J_dbms_memory_heap_initial__size=512m
+      - NEO4J_dbms_memory_heap_max__size=1G
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  emqx:
+    image: ai-water-env-emqx:latest
+    container_name: water_test_emqx
+    hostname: emqx
+    restart: "no"
+    ports:
+      - "11883:1883"
+      - "28080:8083"
+      - "28083:18083"
+    environment:
+      - EMQX_ALLOW_ANONYMOUS=true
+    healthcheck:
+      test: ["CMD", "emqx", "ctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+  minio:
+    image: ai-water-env-minio:latest
+    container_name: water_test_minio
+    hostname: minio
+    restart: "no"
+    ports:
+      - "19000:9000"
+      - "19001:9001"
+    volumes:
+      - water_test_minio_data:/data
+    environment:
+      - MINIO_ROOT_USER=water
+      - MINIO_ROOT_PASSWORD=water12345
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD-SHELL", "exec 3<>/dev/tcp/localhost/9000"]
+      interval: 10s
+      timeout: 5s
+      retries: 20
+
+volumes:
+  water_test_postgres_data:
+  water_test_tdengine_data:
+  water_test_tdengine_logs:
+  water_test_neo4j_data:
+  water_test_neo4j_logs:
+  water_test_neo4j_plugins:
+  water_test_minio_data:

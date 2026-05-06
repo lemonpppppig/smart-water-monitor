@@ -1,0 +1,36 @@
+{
+  "region": "nanchang",
+  "database": "water_env",
+  "bbox": {
+    "min_lon": 115.2734,
+    "max_lon": 116.7908,
+    "min_lat": 28.2663,
+    "max_lat": 28.9991
+  },
+  "description": "南昌市赣江/抚河/鄱阳湖流域 15 个监测站点清单（供 scripts/seed_tdengine.py 在 --region=nanchang 时使用）。字段与 seed_tdengine.py STATIONS 四元组对齐：station_code / station_type / region / river。",
+  "anomalies_hint": [
+    { "station_code": "NC_IP001", "metric": "nh3_n", "peak": 2.38, "start_offset_min": -25, "duration_min": 30, "note": "ALERT-2026-0001 南昌经开区 NH3-N 超标" },
+    { "station_code": "NC_RW005", "metric": "blue_green_algae", "peak": 15800.0, "start_offset_min": -120, "duration_min": 60, "note": "ALERT-2026-0002 鄱阳湖南岸蓝绿藻" },
+    { "station_code": "NC_RW005", "metric": "chlorophyll", "peak": 18.5, "start_offset_min": -120, "duration_min": 60, "note": "ALERT-2026-0002 鄱阳湖南岸叶绿素" },
+    { "station_code": "NC_RW004", "metric": "codmn", "peak": 8.6, "start_offset_min": -300, "duration_min": 90, "note": "ALERT-2026-0003 湾里象湖 CODMn" },
+    { "station_code": "NC_IP003", "metric": "total_p", "peak": 0.18, "start_offset_min": -480, "duration_min": 120, "note": "进贤工业园 TP 中期异常（处置中）" },
+    { "station_code": "NC_BS001", "metric": "codcr", "peak": 28.0, "start_offset_min": -720, "duration_min": 60, "note": "赣江入鄱阳湖 CODCr 已恢复" }
+  ],
+  "stations": [
+    { "station_code": "NC_WS001", "station_name": "象湖水源地",            "station_type": "water_source",     "region": "青云谱区", "river": "象湖水系",    "longitude": 115.9070, "latitude": 28.6152 },
+    { "station_code": "NC_WS002", "station_name": "罗家集赣江中支水源地",  "station_type": "water_source",     "region": "新建区",   "river": "赣江",        "longitude": 115.8420, "latitude": 28.6910 },
+    { "station_code": "NC_WS003", "station_name": "溪霞水库水源地",        "station_type": "water_source",     "region": "新建区",   "river": "潦河",        "longitude": 115.9350, "latitude": 28.9420 },
+    { "station_code": "NC_IP001", "station_name": "南昌经开区工业站",      "station_type": "industrial_park",  "region": "新建区",   "river": "赣江西支",    "longitude": 115.8130, "latitude": 28.7520 },
+    { "station_code": "NC_IP002", "station_name": "高新区艾溪湖工业站",    "station_type": "industrial_park",  "region": "青山湖区", "river": "玉带河",      "longitude": 115.9890, "latitude": 28.6830 },
+    { "station_code": "NC_IP003", "station_name": "进贤工业园工业站",      "station_type": "industrial_park",  "region": "进贤县",   "river": "抚河",        "longitude": 116.3520, "latitude": 28.3680 },
+    { "station_code": "NC_BS001", "station_name": "赣江入鄱阳湖断面站",    "station_type": "boundary_section", "region": "新建区",   "river": "赣江",        "longitude": 116.1720, "latitude": 28.9780 },
+    { "station_code": "NC_BS002", "station_name": "抚河入鄱阳湖断面站",    "station_type": "boundary_section", "region": "进贤县",   "river": "抚河",        "longitude": 116.5480, "latitude": 28.4820 },
+    { "station_code": "NC_BS003", "station_name": "潦河入赣江断面站",      "station_type": "boundary_section", "region": "安义县",   "river": "潦河",        "longitude": 115.7680, "latitude": 28.8250 },
+    { "station_code": "NC_BS004", "station_name": "锦江入赣江断面站",      "station_type": "boundary_section", "region": "新建区",   "river": "锦江",        "longitude": 115.7120, "latitude": 28.4520 },
+    { "station_code": "NC_RW001", "station_name": "安义潦河上游乡村站",    "station_type": "rural_water",      "region": "安义县",   "river": "潦河",        "longitude": 115.4820, "latitude": 28.8510 },
+    { "station_code": "NC_RW002", "station_name": "进贤抚河乡村站",        "station_type": "rural_water",      "region": "进贤县",   "river": "抚河",        "longitude": 116.2630, "latitude": 28.3920 },
+    { "station_code": "NC_RW003", "station_name": "南昌县东新乡村站",      "station_type": "rural_water",      "region": "南昌县",   "river": "抚河",        "longitude": 116.1280, "latitude": 28.4820 },
+    { "station_code": "NC_RW004", "station_name": "湾里象湖乡村站",        "station_type": "rural_water",      "region": "新建区",   "river": "象湖水系",    "longitude": 115.7280, "latitude": 28.7520 },
+    { "station_code": "NC_RW005", "station_name": "鄱阳湖南岸湖滨站",      "station_type": "rural_water",      "region": "进贤县",   "river": "鄱阳湖",      "longitude": 116.3580, "latitude": 28.9420 }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "code": "nanchang",
+  "displayName": "南昌市",
+  "province": "江西省",
+  "timezone": "Asia/Shanghai",
+  "_note_normalMap": "normalMapBounds 暂与 osmBounds 一致（等高/法线贴图到位后按图片实际覆盖反算）",
+  "center": [116.0321, 28.6327],
+  "osmBounds": {
+    "minLat": 28.2663,
+    "maxLat": 28.9991,
+    "minLon": 115.2734,
+    "maxLon": 116.7908
+  },
+  "normalMapBounds": {
+    "minLat": 28.2663,
+    "maxLat": 28.9991,
+    "minLon": 115.2734,
+    "maxLon": 116.7908
+  },
+  "map": {
+    "rivers": "rivers.json",
+    "roads": "roads.json",
+    "normalMap": "normal_map.png"
+  },
+  "db": {
+    "postgresInitDir": "db/postgres",
+    "neo4jInitDir": "db/neo4j",
+    "tdengineSeedStations": 0
+  },
+  "mlModelsDir": "ml_models"
+}

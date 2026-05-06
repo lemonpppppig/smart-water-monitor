@@ -1,0 +1,7 @@
+[project]
+name = "smart-water-monitor-backend"
+version = "0.1.0"
+description = "智慧水环境AI监测平台后端服务"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = []

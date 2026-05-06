@@ -1,0 +1,132 @@
+# 流域水环境AI平台 - 基础设施编排
+# ------------------------------------------------------------
+# 统一部署形态：本地启动后端（uvicorn app.main:app --port 8000）
+#                + Docker 运行基础设施依赖
+# 使用方式：
+#   docker-compose up -d            # 启动所有依赖（默认 REGION_CODE=ganzhou）
+#   REGION_CODE=hefei docker-compose up -d   # 切换到合肥数据初始化
+#   docker-compose down             # 停止（保留数据卷）
+#   docker-compose down -v          # 停止并清空数据卷
+# ------------------------------------------------------------
+# 同机并行三套（赣州/合肥/南昌）时，每份交付物目录下放一份 .env：
+#   COMPOSE_PROJECT_NAME=water-hefei   # 隔离容器名/卷名
+#   CONTAINER_PREFIX=water_hefei       # 容器名前缀（避免 water_postgres 冲突）
+#   PG_PORT=5433 / TAOS_NATIVE_PORT=6130 / ...（见 .env.region.<code>）
+# ------------------------------------------------------------
+
+services:
+  # PostgreSQL (PostGIS + pgvector)
+  postgres:
+    build:
+      context: ./infrastructure/docker/postgres
+      dockerfile: Dockerfile
+    container_name: ${CONTAINER_PREFIX:-water}_postgres
+    hostname: postgres
+    restart: unless-stopped
+    ports:
+      - "${PG_PORT:-5432}:5432"
+    volumes:
+      - water_postgres_data:/var/lib/postgresql/data
+      - ./regions/${REGION_CODE:-ganzhou}/db/postgres:/docker-entrypoint-initdb.d:ro
+    environment:
+      - POSTGRES_DB=water_env
+      - POSTGRES_USER=water
+      - POSTGRES_PASSWORD=water123
+      - REGION_CODE=${REGION_CODE:-ganzhou}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U water -d water_env"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # TDengine 时序数据库
+  tdengine:
+    image: tdengine/tdengine:3.2.3.0
+    container_name: ${CONTAINER_PREFIX:-water}_tdengine
+    hostname: tdengine
+    restart: unless-stopped
+    ports:
+      - "${TAOS_NATIVE_PORT:-6030}:6030"   # taosc 原生客户端
+      - "${TAOS_REST_PORT:-6041}:6041"     # REST API
+    volumes:
+      - water_tdengine_data:/var/lib/taos
+      - water_tdengine_logs:/var/log/taos
+    environment:
+      - TAOS_FQDN=tdengine
+    healthcheck:
+      test: ["CMD", "taos", "-s", "show databases"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Neo4j 图数据库
+  neo4j:
+    image: neo4j:5.15-community
+    container_name: ${CONTAINER_PREFIX:-water}_neo4j
+    hostname: neo4j
+    restart: unless-stopped
+    ports:
+      - "${NEO4J_HTTP_PORT:-7474}:7474"
+      - "${NEO4J_BOLT_PORT:-7687}:7687"
+    volumes:
+      - water_neo4j_data:/data
+      - water_neo4j_logs:/logs
+      - water_neo4j_plugins:/plugins
+    environment:
+      - NEO4J_AUTH=neo4j/water123
+      - NEO4J_PLUGINS=["apoc"]
+      - NEO4J_dbms_memory_heap_initial__size=512m
+      - NEO4J_dbms_memory_heap_max__size=1G
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:7474"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # EMQX MQTT Broker
+  emqx:
+    image: emqx/emqx:5.5.1
+    container_name: ${CONTAINER_PREFIX:-water}_emqx
+    hostname: emqx
+    restart: unless-stopped
+    ports:
+      - "${EMQX_MQTT_PORT:-1883}:1883"         # MQTT
+      - "${EMQX_WS_PORT:-8083}:8083"           # MQTT over WebSocket
+      - "${EMQX_DASHBOARD_PORT:-18083}:18083"  # Dashboard
+    environment:
+      - EMQX_ALLOW_ANONYMOUS=true
+    healthcheck:
+      test: ["CMD", "emqx", "ctl", "status"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # MinIO 对象存储
+  minio:
+    image: minio/minio:RELEASE.2024-01-13T07-53-03Z
+    container_name: ${CONTAINER_PREFIX:-water}_minio
+    hostname: minio
+    restart: unless-stopped
+    ports:
+      - "${MINIO_S3_PORT:-9000}:9000"
+      - "${MINIO_CONSOLE_PORT:-9001}:9001"
+    volumes:
+      - water_minio_data:/data
+    environment:
+      - MINIO_ROOT_USER=water
+      - MINIO_ROOT_PASSWORD=water12345
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  water_postgres_data:
+  water_tdengine_data:
+  water_tdengine_logs:
+  water_neo4j_data:
+  water_neo4j_logs:
+  water_neo4j_plugins:
+  water_minio_data:
