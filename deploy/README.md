@@ -50,7 +50,7 @@ npm run dev
 
 ```powershell
 python deploy/init_all.py --up                    # 启动容器 + 全量初始化
-python deploy/init_all.py --region hefei           # 指定城市（默认 ganzhou）
+python deploy/init_all.py --region hefei           # 指定城市（默认自动检测 regions/ 下可用区域）
 python deploy/init_all.py --skip-neo4j             # 只跑 TDengine
 python deploy/init_all.py --skip-tdengine          # 只跑 Neo4j
 python deploy/init_all.py --force-neo4j            # Neo4j 清空重导
@@ -69,7 +69,7 @@ python deploy/init_all.py --days 30 --interval 10  # 控制时序数据量
 .\deploy\pack-region.ps1 -Region nanchang -IncludeImages
 
 # 指定输出目录，不生成 zip
-.\deploy\pack-region.ps1 -Region ganzhou -OutDir D:\delivery -NoZip
+.\deploy\pack-region.ps1 -Region nanchang -OutDir D:\delivery -NoZip
 ```
 
 脚本自动完成：复制工程 → 删除其他 region → 改写环境变量 → 注入端口偏移 → 可选打 zip。

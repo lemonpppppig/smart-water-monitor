@@ -34,7 +34,6 @@
 [CmdletBinding()]
 param(
     [Parameter(Mandatory = $true)]
-    [ValidateSet('ganzhou', 'hefei', 'nanchang')]
     [string]$Region,
 
     [string]$OutDir = '',
@@ -109,7 +108,7 @@ $OutDir   = (New-Item -ItemType Directory -Path $OutDir -Force).FullName
 $PackName = "ai-water-env-$Region"
 $PackDir  = Join-Path $OutDir $PackName
 
-$AllRegions    = @('ganzhou', 'hefei', 'nanchang')
+$AllRegions    = @(Get-ChildItem -Path (Join-Path $RepoRoot 'regions') -Directory | Where-Object { $_.Name -notlike '_*' } | ForEach-Object { $_.Name })
 $OtherRegions  = $AllRegions | Where-Object { $_ -ne $Region }
 
 Write-Host ""

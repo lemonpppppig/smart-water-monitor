@@ -205,7 +205,7 @@ def wait_container_healthy(name: str, max_seconds: int) -> bool:
     return False
 
 
-def cmd_up(region: str = "ganzhou") -> int:
+def cmd_up(region: str = "nanchang") -> int:
     log_step(f"compose up -d  (project={PROJECT_NAME}, REGION_CODE={region})")
     compose("up", "-d", env_extra={"REGION_CODE": region})
 
@@ -318,14 +318,14 @@ def verify_postgres() -> bool:
     for i in range(0, len(tables), 4):
         print("    " + "  ".join(f"{t:<28}" for t in tables[i:i + 4]))
 
-    # 关键表探测（与 regions/ganzhou/db/postgres 真实 schema 对齐）
+    # 关键表探测（与 regions/<region>/db/postgres 真实 schema 对齐）
     probes = [
         "stations",            # 01_init.sql
         "alerts",              # 01_init.sql
         "alert_rules",         # 01_init.sql
         "users",               # 01_init.sql
-        "rivers",              # 02_ganzhou_data.sql
-        "districts",           # 02_ganzhou_data.sql
+        "rivers",              # 02_*_data.sql
+        "districts",           # 02_*_data.sql
         "pollution_cases",     # 03_pollution_cases.sql
         "metrics_catalog",     # 04_additional_tables.sql
         "ai_station_models",   # 04_additional_tables.sql
@@ -423,8 +423,8 @@ def main() -> int:
                         help="只显示测试栈当前容器状态")
     parser.add_argument("--init", action="store_true",
                         help="up 成功后继续验证数据初始化：Postgres initdb + init_neo4j.py + seed_tdengine.py")
-    parser.add_argument("--region", default=os.getenv("REGION_CODE", "ganzhou"),
-                        help="初始化时的 region，默认 ganzhou。会同时传给 compose 以挂载 regions/<region>/db/postgres")
+    parser.add_argument("--region", default=os.getenv("REGION_CODE", "nanchang"),
+                        help="初始化时的 region，默认读环境变量 REGION_CODE。会同时传给 compose 以挂载 regions/<region>/db/postgres")
     parser.add_argument("--days", type=int, default=1,
                         help="TDengine 种子回溯天数（默认 1，冷烟用，正式验证可传 7/30/90）")
     args = parser.parse_args()

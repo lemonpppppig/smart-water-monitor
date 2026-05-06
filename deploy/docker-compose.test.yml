@@ -22,7 +22,7 @@ services:
       - "15432:5432"
     volumes:
       - water_test_postgres_data:/var/lib/postgresql/data
-      - ../regions/${REGION_CODE:-ganzhou}/db/postgres:/docker-entrypoint-initdb.d
+      - ../regions/${REGION_CODE:-nanchang}/db/postgres:/docker-entrypoint-initdb.d
     environment:
       - POSTGRES_DB=water_env
       - POSTGRES_USER=water

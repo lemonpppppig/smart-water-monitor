@@ -1,11 +1,11 @@
 /**
  * OSM XML 河流数据提取脚本（区域化版本）
- * 根据 --region 参数（或 REGION_CODE 环境变量，默认 ganzhou）从
+ * 根据 --region 参数（或 REGION_CODE 环境变量）从
  * regions/<region>/osm/*.osm 提取 waterway=river/stream 坐标，
  * 输出到 regions/<region>/map/rivers.json。
  *
  * 用法:
- *   node scripts/extract-rivers.mjs                 # 默认 region=ganzhou
+ *   node scripts/extract-rivers.mjs                 # 自动检测 regions/ 下可用区域
  *   node scripts/extract-rivers.mjs --region hefei
  *   node scripts/extract-rivers.mjs --input /path/to/custom.osm --region nanchang
  */
@@ -31,7 +31,20 @@ function parseCliArgs() {
 }
 
 const cli = parseCliArgs();
-const REGION = cli.region || process.env.REGION_CODE || "ganzhou";
+
+function detectRegion() {
+  const regionsDir = resolve(PROJECT_ROOT, "regions");
+  if (existsSync(regionsDir)) {
+    const dirs = readdirSync(regionsDir, { withFileTypes: true })
+      .filter(d => d.isDirectory() && !d.name.startsWith("_"))
+      .map(d => d.name)
+      .sort();
+    if (dirs.length > 0) return dirs[0];
+  }
+  return "nanchang";
+}
+
+const REGION = cli.region || process.env.REGION_CODE || detectRegion();
 const REGION_DIR = resolve(PROJECT_ROOT, "regions", REGION);
 const CONFIG_PATH = join(REGION_DIR, "region.config.json");
 

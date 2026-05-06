@@ -19,7 +19,7 @@ seed_tdengine.py
     2) 只需 Python 3.8+，无需额外依赖。
 
 用法（宿主机默认端口）：
-    python scripts/seed_tdengine.py                  # 默认 region=ganzhou
+    python scripts/seed_tdengine.py                  # 自动检测 regions/ 下可用区域
     python scripts/seed_tdengine.py --region hefei   # 切换城市（需预先扩展 STATIONS）
 
     # 自定义
@@ -48,6 +48,22 @@ from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
+
+
+def _detect_region() -> str:
+    """自动检测 regions/ 目录下可用的区域（排除 _common），取第一个。"""
+    env_val = os.getenv("REGION_CODE")
+    if env_val:
+        return env_val
+    regions_dir = PROJECT_ROOT / "regions"
+    if regions_dir.exists():
+        candidates = sorted(
+            d.name for d in regions_dir.iterdir()
+            if d.is_dir() and not d.name.startswith("_")
+        )
+        if candidates:
+            return candidates[0]
+    return "nanchang"
 
 # ----------------------------------------------------------------------------
 # 73 个站点：station_id / station_type / region / river / 基础基线
@@ -431,8 +447,8 @@ def ingest_station(
 
 def parse_args() -> argparse.Namespace:
     p = argparse.ArgumentParser(description="TDengine 水质历史数据种子脚本（区域化）")
-    p.add_argument("--region", default=os.getenv("REGION_CODE", "ganzhou"),
-                   help="目标区域代码，默认从环境变量 REGION_CODE 读取（默认 ganzhou）")
+    p.add_argument("--region", default=_detect_region(),
+                   help="目标区域代码，默认自动检测 regions/ 目录下可用区域（或读环境变量 REGION_CODE）")
     p.add_argument("--url", default=os.getenv("TDENGINE_HTTP_URL", "http://localhost:16041"),
                    help="TDengine REST 地址，默认 http://localhost:16041")
     p.add_argument("--user", default=os.getenv("TDENGINE_USER", "root"))
@@ -457,9 +473,8 @@ def main() -> int:
         print(f"[INFO] 已加载 regions/{args.region}/db/tdengine/stations.json："
               f"{len(STATIONS)} 个站点 / {len(ANOMALIES)} 条异常")
     else:
-        if args.region != "ganzhou":
-            print(f"[WARN] 未找到 regions/{args.region}/db/tdengine/stations.json，"
-                  f"回退内置赣州 73 站点——这会导致 {args.region} 数据闭环断裂，请补齐站点配置！")
+        print(f"[WARN] 未找到 regions/{args.region}/db/tdengine/stations.json，"
+              f"回退内置赣州 73 站点——请补齐站点配置！")
     print(f"[INFO] region={args.region} target={args.url} db={args.database} days={args.days} interval={args.interval}min")
     client = TDengineREST(args.url, args.user, args.password, args.database)
     try:

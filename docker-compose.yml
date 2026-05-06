@@ -3,7 +3,7 @@
 # 统一部署形态：本地启动后端（uvicorn app.main:app --port 8000）
 #                + Docker 运行基础设施依赖
 # 使用方式：
-#   docker-compose up -d            # 启动所有依赖（默认 REGION_CODE=ganzhou）
+#   docker-compose up -d            # 启动所有依赖（默认 REGION_CODE=nanchang）
 #   REGION_CODE=hefei docker-compose up -d   # 切换到合肥数据初始化
 #   docker-compose down             # 停止（保留数据卷）
 #   docker-compose down -v          # 停止并清空数据卷
@@ -27,12 +27,12 @@ services:
       - "${PG_PORT:-5432}:5432"
     volumes:
       - water_postgres_data:/var/lib/postgresql/data
-      - ./regions/${REGION_CODE:-ganzhou}/db/postgres:/docker-entrypoint-initdb.d:ro
+      - ./regions/${REGION_CODE:-nanchang}/db/postgres:/docker-entrypoint-initdb.d:ro
     environment:
       - POSTGRES_DB=water_env
       - POSTGRES_USER=water
       - POSTGRES_PASSWORD=water123
-      - REGION_CODE=${REGION_CODE:-ganzhou}
+      - REGION_CODE=${REGION_CODE:-nanchang}
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U water -d water_env"]
       interval: 5s

@@ -14,7 +14,7 @@ Windows / Linux 通用一键初始化入口。
     5) 调用 scripts/seed_tdengine.py 写入当前 region 的 90 天仿真时序
 
 用法（项目根目录执行）：
-    python deploy/init_all.py                     # 默认 region=ganzhou（或环境变量 REGION_CODE）
+    python deploy/init_all.py                     # 自动检测 regions/ 下可用区域（或环境变量 REGION_CODE）
     python deploy/init_all.py --region hefei      # 指定城市
     python deploy/init_all.py --up                # 同时 docker compose up -d
     python deploy/init_all.py --skip-tdengine     # 只初始化 Neo4j
@@ -38,7 +38,25 @@ COMPOSE_FILE = PROJECT_ROOT / "docker-compose.yml"
 SEED_TDENGINE = PROJECT_ROOT / "scripts" / "seed_tdengine.py"
 INIT_NEO4J = Path(__file__).resolve().parent / "init_neo4j.py"
 IMAGES_DIR = Path(__file__).resolve().parent / "images"
-DEFAULT_REGION = os.getenv("REGION_CODE", "ganzhou")
+
+
+def detect_region() -> str:
+    """自动检测 regions/ 目录下可用的区域（排除 _common），取第一个。"""
+    env_val = os.getenv("REGION_CODE")
+    if env_val:
+        return env_val
+    regions_dir = PROJECT_ROOT / "regions"
+    if regions_dir.exists():
+        candidates = sorted(
+            d.name for d in regions_dir.iterdir()
+            if d.is_dir() and not d.name.startswith("_")
+        )
+        if candidates:
+            return candidates[0]
+    return "nanchang"
+
+
+DEFAULT_REGION = detect_region()
 CONTAINER_PREFIX = os.getenv("CONTAINER_PREFIX", "water")
 DEFAULT_TDENGINE_URL = os.getenv("TDENGINE_HTTP_URL", "http://localhost:6041")
 DEFAULT_NEO4J_URI = os.getenv("NEO4J_URI", "bolt://localhost:7687")
@@ -206,7 +224,7 @@ def run_seed_tdengine(region: str, url: str, days: int, interval: int) -> int:
 def main() -> int:
     parser = argparse.ArgumentParser(description="流域水环境平台 - 本地开发一键初始化（支持多区域）")
     parser.add_argument("--region", default=DEFAULT_REGION,
-                        help="目标城市编码（ganzhou/hefei/nanchang/...），默认读环境变量 REGION_CODE 或 'ganzhou'")
+                        help="目标城市编码，默认自动检测 regions/ 目录下可用区域（或读环境变量 REGION_CODE）")
     parser.add_argument("--up", action="store_true",
                         help="先执行 docker compose up -d 启动基础设施")
     parser.add_argument("--load-images", action="store_true",

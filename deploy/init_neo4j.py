@@ -12,7 +12,7 @@ infrastructure/docker/neo4j/init。
 只依赖 `neo4j` Python 驱动（项目 backend/requirements.txt 已含）。
 
 用法：
-    python deploy/init_neo4j.py                    # 默认 region=ganzhou
+    python deploy/init_neo4j.py                    # 自动检测区域
     python deploy/init_neo4j.py --region hefei     # 切换合肥
     python deploy/init_neo4j.py --force            # 即使已有数据也强制重导
     python deploy/init_neo4j.py --uri bolt://localhost:7687 --password water123
@@ -36,7 +36,24 @@ except ImportError:
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DEFAULT_INIT_DIR = PROJECT_ROOT / "infrastructure" / "docker" / "neo4j" / "init"
 REGIONS_ROOT = PROJECT_ROOT / "regions"
-DEFAULT_REGION = os.getenv("REGION_CODE", "ganzhou")
+
+
+def detect_region() -> str:
+    """自动检测 regions/ 目录下可用的区域（排除 _common），取第一个。"""
+    env_val = os.getenv("REGION_CODE")
+    if env_val:
+        return env_val
+    if REGIONS_ROOT.exists():
+        candidates = sorted(
+            d.name for d in REGIONS_ROOT.iterdir()
+            if d.is_dir() and not d.name.startswith("_")
+        )
+        if candidates:
+            return candidates[0]
+    return "nanchang"
+
+
+DEFAULT_REGION = detect_region()
 CYPHER_FILES = [
     "01_knowledge_graph.cypher",
     "02_river_topology.cypher",

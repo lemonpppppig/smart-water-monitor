@@ -1,21 +1,39 @@
 """
 统一应用配置 - 合并所有微服务配置
 """
+import os
+from pathlib import Path
+
 from pydantic_settings import BaseSettings
+
+
+def _detect_region() -> str:
+    """自动检测 regions/ 目录下可用的区域（排除 _common），取第一个。"""
+    env_val = os.getenv("REGION_CODE")
+    if env_val:
+        return env_val
+    # backend/ 的父目录即项目根
+    project_root = Path(__file__).resolve().parent.parent.parent
+    regions_dir = project_root / "regions"
+    if regions_dir.exists():
+        candidates = sorted(
+            d.name for d in regions_dir.iterdir()
+            if d.is_dir() and not d.name.startswith("_")
+        )
+        if candidates:
+            return candidates[0]
+    return "nanchang"
 
 
 class Settings(BaseSettings):
     """应用配置"""
-    # 区域配置（南昌交付默认值，运行时被 backend/.env 覆盖）
-    REGION_CODE: str = "nanchang"
+    # 区域配置（自动检测 regions/ 目录，运行时被 backend/.env 覆盖）
+    REGION_CODE: str = _detect_region()
 
     # 服务配置
     SERVICE_NAME: str = "water-env-backend"
     SERVICE_PORT: int = 8000
     DEBUG: bool = False
-
-    # 区域编码（多城市独立交付，对应 regions/<REGION_CODE>/ 下的资源）
-    REGION_CODE: str = "nanchang"
 
     # PostgreSQL 数据库配置（station / alert / report / ai 共用）
     DATABASE_URL: str = "postgresql+asyncpg://water:water123@localhost:5432/water_env"
