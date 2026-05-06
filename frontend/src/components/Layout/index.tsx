@@ -14,10 +14,10 @@ export default function Layout() {
 
       {/* Main Content */}
       <div className="ml-[240px] h-screen flex flex-col overflow-hidden">
-        {/* Header - 大屏模式下隐藏 */}
-        {!isDashboard && <Header />}
+        {/* Header 始终显示，避免大屏把顶栏吃掉 */}
+        <Header />
 
-        {/* Page Content */}
+        {/* Page Content：大屏模式下不加 padding、不滚动 */}
         <main className={isDashboard ? 'flex-1 relative overflow-hidden' : 'flex-1 p-6 overflow-y-auto'}>
           <Outlet />
         </main>

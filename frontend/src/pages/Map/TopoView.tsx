@@ -82,9 +82,14 @@ export default function TopoView() {
 
   const [stations, setStations] = useState<StationItem[]>([]);
   const [hovered, setHovered] = useState<string | null>(null);
+  const [hoverPos, setHoverPos] = useState<{ x: number; y: number } | null>(null);
   const [canvasReady, setCanvasReady] = useState(false);
   const [stationData, setStationData] = useState<Record<string, any>>({});
+  const [refreshingMap, setRefreshingMap] = useState<Record<string, boolean>>({});
   const fetchingRef = useRef<Set<string>>(new Set());
+  const fetchedAtRef = useRef<Record<string, number>>({});
+  // 缓存有效期：若上次拉取距今超过此值，悬停时触发后台刷新
+  const CACHE_TTL_MS = 15_000;
 
   // 计算投影参数（只算一次）
   const geo = useMemo(() => {
@@ -148,25 +153,77 @@ export default function TopoView() {
       .catch(() => setStations([]));
   }, []);
 
+  // 拉取单个站点最新数据的内部函数：
+  //  - 禁止同一 code 重复并发
+  //  - 有缓存时展示旧数据，并标记 refreshing；成功后用新数据替换
+  const fetchStationLatest = useCallback((code: string) => {
+    if (!code) return;
+    if (fetchingRef.current.has(code)) return;
+    fetchingRef.current.add(code);
+    setRefreshingMap(prev => (prev[code] ? prev : { ...prev, [code]: true }));
+    dataApi.getLatestData(code)
+      .then((res: any) => {
+        const d = res?.data ?? res;
+        fetchedAtRef.current[code] = Date.now();
+        setStationData(prev => ({ ...prev, [code]: d }));
+      })
+      .catch(() => {
+        // 失败时，若已有缓存则保留旧数据，仅不更新 fetchedAt
+        setStationData(prev => (prev[code] ? prev : { ...prev, [code]: { _error: true } }));
+      })
+      .finally(() => {
+        fetchingRef.current.delete(code);
+        setRefreshingMap(prev => {
+          if (!prev[code]) return prev;
+          const next = { ...prev };
+          delete next[code];
+          return next;
+        });
+      });
+  }, []);
+
+  // 站点列表到位后：限并发预拉一批最新数据，让首次悬停也能秒出
+  useEffect(() => {
+    if (stationPoints.length === 0) return;
+    const codes = stationPoints.map(s => s.station_code).filter(Boolean);
+    let cancelled = false;
+    const CONCURRENCY = 6;
+    let idx = 0;
+    const runOne = async (): Promise<void> => {
+      while (!cancelled) {
+        const i = idx++;
+        if (i >= codes.length) return;
+        const code = codes[i];
+        if (stationData[code] || fetchingRef.current.has(code)) continue;
+        fetchStationLatest(code);
+        // 简单间隔，避免瞬时注入大量请求
+        await new Promise(r => setTimeout(r, 40));
+      }
+    };
+    const workers = Array.from({ length: Math.min(CONCURRENCY, codes.length) }, () => runOne());
+    Promise.all(workers).catch(() => { /* ignore */ });
+    return () => { cancelled = true; };
+    // 仅当站点点位集变化时运行（站点列表加载后仅触发一次）
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stationPoints.length]);
+
   // 悬浮时拉取站点最新数据（用 station_code 匹配 TDengine 子表）
+  //   - 无缓存 -> 立即拉取（StationCard 展示加载中）
+  //   - 有缓存且过期 -> 展示旧数据 + 后台刷新标识，结束后替换
+  //   - 有缓存且未过期 -> 不重复请求
   useEffect(() => {
     if (!hovered) return;
     const station = stationPoints.find(s => s.id === hovered);
     if (!station) return;
     const code = station.station_code;
-    // 已缓存或正在拉取则跳过
-    if (stationData[code] || fetchingRef.current.has(code)) return;
-    fetchingRef.current.add(code);
-    dataApi.getLatestData(code)
-      .then((res: any) => {
-        const d = res?.data ?? res;
-        setStationData(prev => ({ ...prev, [code]: d }));
-      })
-      .catch(() => {
-        setStationData(prev => ({ ...prev, [code]: { _error: true } }));
-      })
-      .finally(() => { fetchingRef.current.delete(code); });
-  }, [hovered, stationPoints, stationData]);
+    if (!code) return;
+    const cached = stationData[code];
+    const fetchedAt = fetchedAtRef.current[code] || 0;
+    const expired = Date.now() - fetchedAt > CACHE_TTL_MS;
+    if (!cached || expired) {
+      fetchStationLatest(code);
+    }
+  }, [hovered, stationPoints, stationData, fetchStationLatest]);
 
   // Canvas 一次性绘制路网
   useEffect(() => {
@@ -371,20 +428,41 @@ export default function TopoView() {
                 cursor: "pointer",
                 transition: "width 0.1s, height 0.1s",
               }}
-              onMouseEnter={() => setHovered(s.id)}
-              onMouseLeave={() => setHovered(null)}
+              onMouseEnter={(e) => {
+                setHovered(s.id);
+                // 计算站点在容器内的真实像素坐标（已包含 transform 的缩放/平移）
+                const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                const cont = containerRef.current?.getBoundingClientRect();
+                if (cont) {
+                  setHoverPos({
+                    x: rect.left - cont.left + rect.width / 2,
+                    y: rect.top - cont.top + rect.height / 2,
+                  });
+                }
+              }}
+              onMouseLeave={() => {
+                setHovered(null);
+                setHoverPos(null);
+              }}
             />
           );
         })}
       </div>
 
-      {/* 站点悬浮数据卡片（固定定位，不跟随变换） */}
-      {hovered && (() => {
+      {/* 站点悬浮数据卡片（定位在站点旁边，不跟随变换） */}
+      {hovered && hoverPos && (() => {
         const station = stationPoints.find(s => s.id === hovered);
         if (!station) return null;
         const latest = stationData[station.station_code];
+        const refreshing = !!refreshingMap[station.station_code];
         return (
-          <StationCard station={station} data={latest} />
+          <StationCard
+            station={station}
+            data={latest}
+            refreshing={refreshing}
+            pos={hoverPos}
+            container={containerRef.current}
+          />
         );
       })()}
 
@@ -506,7 +584,13 @@ const STATION_TYPE_LABEL: Record<string, string> = {
   rural_water: '农村水体',
 };
 
-function StationCard({ station, data }: { station: ProjectedStation; data: any }) {
+function StationCard({ station, data, refreshing, pos, container }: {
+  station: ProjectedStation;
+  data: any;
+  refreshing: boolean;
+  pos: { x: number; y: number };
+  container: HTMLDivElement | null;
+}) {
   const color = STATION_COLOR[station.station_type] || DEFAULT_STATION_COLOR;
   const typeLabel = STATION_TYPE_LABEL[station.station_type] || station.station_type;
 
@@ -518,16 +602,38 @@ function StationCard({ station, data }: { station: ProjectedStation; data: any }
 
   // 解析指标数据（兼容多种响应格式）
   const metrics = data?.data ?? data;
-  const isLoading = !data;
-  const isError = data?._error;
+  const hasData = !!(metrics && !(metrics as any)._error);
+  // 首次加载：无缓存 + 正在刷新，展示加载中
+  const isLoading = !data && refreshing;
+  // 无数据且错误：仅当没有任何数据且无刷新时显示错误
+  const isError = !hasData && (data as any)?._error && !refreshing;
+
+  // 卡片尺寸与边界避让
+  const CARD_W = 280;
+  const CARD_H_EST = 220;
+  const OFFSET = 14;
+  const contW = container?.clientWidth ?? window.innerWidth;
+  const contH = container?.clientHeight ?? window.innerHeight;
+
+  // 优先放在站点右侧；右侧放不下则改为左侧
+  let left = pos.x + OFFSET;
+  if (left + CARD_W + 8 > contW) {
+    left = pos.x - OFFSET - CARD_W;
+  }
+  if (left < 8) left = 8;
+
+  // 垂直方向以站点为中心，上下避让
+  let top = pos.y - CARD_H_EST / 2;
+  if (top + CARD_H_EST + 8 > contH) top = contH - CARD_H_EST - 8;
+  if (top < 8) top = 8;
 
   return (
     <div
       style={{
         position: "absolute",
-        top: 60,
-        left: 16,
-        width: 280,
+        top,
+        left,
+        width: CARD_W,
         background: "rgba(10, 18, 32, 0.94)",
         border: `1px solid ${color}44`,
         borderRadius: 10,
@@ -535,12 +641,43 @@ function StationCard({ station, data }: { station: ProjectedStation; data: any }
         zIndex: 30,
         pointerEvents: "none",
         fontFamily: "system-ui, -apple-system, 'Microsoft YaHei'",
+        boxShadow: "0 8px 28px rgba(0,0,0,0.45)",
       }}
     >
       {/* 头部 */}
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
         <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, flexShrink: 0 }} />
-        <span style={{ color: "#fff", fontSize: 13, fontWeight: 600 }}>{station.station_name}</span>
+        <span style={{ color: "#fff", fontSize: 13, fontWeight: 600, flex: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{station.station_name}</span>
+        {/* 后台刷新标识：已有缓存数据时显示，暖提示用户数据正在更新 */}
+        {refreshing && hasData && (
+          <span
+            title="数据刷新中"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 10,
+              color: "#7dd3fc",
+              background: "rgba(14,165,233,0.12)",
+              border: "1px solid rgba(14,165,233,0.3)",
+              padding: "1px 6px",
+              borderRadius: 10,
+            }}
+          >
+            <span
+              style={{
+                width: 8,
+                height: 8,
+                borderRadius: "50%",
+                border: "1.5px solid #7dd3fc",
+                borderTopColor: "transparent",
+                display: "inline-block",
+                animation: "stationCardSpin 0.8s linear infinite",
+              }}
+            />
+            刷新中
+          </span>
+        )}
       </div>
       <div style={{ display: "flex", gap: 8, marginBottom: 8, fontSize: 11 }}>
         <span style={{ color: color, background: `${color}18`, padding: "1px 6px", borderRadius: 4 }}>{typeLabel}</span>
@@ -584,6 +721,7 @@ function StationCard({ station, data }: { station: ProjectedStation; data: any }
       {!isLoading && !isError && !metrics && (
         <div style={{ color: "#64748b", fontSize: 11, textAlign: "center", padding: "8px 0" }}>暂无监测数据</div>
       )}
+      <style>{`@keyframes stationCardSpin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

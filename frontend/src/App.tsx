@@ -71,7 +71,8 @@ function AppContent() {
       <Routes>
         <Route path="/" element={<Layout />}>
           {/* 1. 运行态势 */}
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<Home />} />
+          <Route path="home" element={<Home />} />
           <Route path="dashboard" element={<Dashboard />} />
 
           {/* 2. 站点中心 */}
